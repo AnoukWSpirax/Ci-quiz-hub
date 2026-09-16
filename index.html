@@ -63,7 +63,7 @@ if(p.get('room')){
         ?.closest('div')
         ?.style.setProperty('display','none');
 
-}
+}}
 function cleanRoom(v){return v.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6)}
 async function hostGame(){room=cleanRoom($('hostRoom').value);if(!room)return msg('Enter a room code.');role='host';await db.ref('rooms/'+room+'/meta').update({status:'lobby',questionIndex:-1,revealed:false,updatedAt:firebase.database.ServerValue.TIMESTAMP});enterRoom()}
 async function joinGame(){room=cleanRoom($('joinRoom').value);const pseudo=$('pseudo').value.trim().slice(0,24);if(!room||!pseudo)return msg('Enter the room code and a nickname.');role='player';const snap=await db.ref(`rooms/${room}/players`).orderByChild('pseudoLower').equalTo(pseudo.toLowerCase()).once('value');if(snap.exists())return msg('This nickname is already in use. Please choose another.');await db.ref(`rooms/${room}/players/${uid}`).set({pseudo,pseudoLower:pseudo.toLowerCase(),score:0,correct:0,joinedAt:firebase.database.ServerValue.TIMESTAMP});enterRoom()}
