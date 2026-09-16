@@ -58,7 +58,80 @@ function renderState(){const meta=state.meta||{status:'lobby',questionIndex:-1};
 async function startQuestion(i){const q=questions[i];await db.ref(`rooms/${room}/answers/${i}`).remove();await db.ref(`rooms/${room}/meta`).set({status:'question',questionIndex:i,revealed:false,startedAt:firebase.database.ServerValue.TIMESTAMP,duration:q.seconds})}
 function renderQuestion(meta){show('quiz');const i=meta.questionIndex,q=questions[i];$('qTag').textContent=q.category;$('qCount').textContent=`Question ${i+1} of ${questions.length}`;$('question').textContent=q.text;$('progress').style.width=((i+1)/questions.length*100)+'%';const my=state.answers?.[i]?.[uid];$('answers').innerHTML=q.options.map((o,n)=>`<button class="choice ${my?.choice===n?'sel':''} ${meta.revealed?(n===q.correct?'correct':my?.choice===n?'wrong':''):''}" ${my||meta.revealed?'disabled':''} onclick="answer(${n})"><b>${String.fromCharCode(65+n)}.</b> ${escapeHtml(o)}</button>`).join('');$('answerStatus').classList.toggle('hidden',!my&&!meta.revealed);if(my&&!meta.revealed){$('answerStatus').className='status';$('answerStatus').textContent='Answer locked. Waiting for the facilitator.'}if(meta.revealed){const ok=my?.choice===q.correct;$('answerStatus').className='status '+(ok?'good':'bad');$('answerStatus').innerHTML=`<b>${ok?'Correct!':'Not this time.'}</b> ${escapeHtml(q.explanation)}${my?`<br><b>Points: ${my.points||0}</b>`:''}`}if(role==='host'){$('answerCount').textContent=`${Object.keys(state.answers?.[i]||{}).length} / ${Object.keys(state.players||{}).length} answered`}runTimer(meta)}
 function runTimer(meta){clearInterval(timerInt);const end=(meta.startedAt||Date.now())+meta.duration*1000;const tick=()=>{const left=Math.max(0,Math.ceil((end-Date.now())/1000));$('time').textContent=left;$('timer').style.setProperty('--pct',(left/meta.duration*100)+'%');if(left<=0)clearInterval(timerInt)};tick();timerInt=setInterval(tick,250)}
-async function answer(choice){if(role!=='player')return;const meta=state.meta,q=questions[meta.questionIndex];if(meta.status!=='question'||state.answers?.[meta.questionIndex]?.[uid])return;const elapsed=Math.max(0,Date.now()-meta.startedAt);const correct=choice===q.correct;const ratio=Math.max(0,1-elapsed/(q.seconds*1000));const points=correct?Math.round(100+900*ratio):0;const a={choice,correct,elapsedMs:elapsed,points,answeredAt:firebase.database.ServerValue.TIMESTAMP};await db.ref(`rooms/${room}/answers/${meta.questionIndex}/${uid}`).set(a);if(correct){await db.ref(`rooms/${room}/players/${uid}`).transaction(p=>p?({...p,score:(p.score||0)+points,correct:(p.correct||0)+1}):p)}}
+async function answer(choice){
+
+    if(role !== 'player') return;
+
+    const meta = state.meta;
+    const q = questions[meta.questionIndex];
+
+    // Already answered ?
+    if(meta.status !== 'question') return;
+
+    const existingAnswer =
+        state.answers?.[meta.questionIndex]?.[uid];
+
+    if(existingAnswer){
+        return;
+    }
+
+    const elapsed = Math.max(
+        0,
+        Date.now() - meta.startedAt
+    );
+
+    const correct = choice === q.correct;
+
+    const ratio = Math.max(
+        0,
+        1 - elapsed / (q.seconds * 1000)
+    );
+
+    const points = correct
+        ? Math.round(100 + 900 * ratio)
+        : 0;
+
+    const answerData = {
+        choice,
+        correct,
+        elapsedMs: elapsed,
+        points,
+        answeredAt:
+            firebase.database.ServerValue.TIMESTAMP
+    };
+
+    await db.ref(
+    `rooms/${room}/answers/${meta.questionIndex}/${uid}`
+).set(answerData);
+
+// Lock UI immediately
+renderQuestion(state.meta);
+
+    if(correct){
+        await db.ref(
+            `rooms/${room}/players/${uid}`
+        ).transaction(player =>
+            player
+                ? {
+                    ...player,
+                    score:(player.score || 0) + points,
+                    correct:(player.correct || 0) + 1
+                  }
+                : player
+        );
+    }
+
+    $('answerStatus').classList.remove('hidden');
+    $('answerStatus').className = 'status good';
+
+    $('answerStatus').innerHTML =
+    '✅ Answer submitted<br>Waiting for the facilitator...';
+
+document
+    .querySelectorAll('.choice')
+    .forEach(btn => btn.disabled = true);
+
+}
 async function revealAnswer(){await db.ref(`rooms/${room}/meta`).update({status:'revealed',revealed:true})}
 async function nextStage(){const i=state.meta.questionIndex;if(i===4){await db.ref(`rooms/${room}/meta`).update({status:'midboard'});return}if(i===9){await db.ref(`rooms/${room}/meta`).update({status:'final'});return}startQuestion(i+1)}
 function renderBoard(final){show('leaderboard');$('leaderTag').textContent=final?'FINAL LEADERBOARD':'HALF-TIME LEADERBOARD';$('leaderTitle').textContent=final?'Congratulations!':'Top scores after 5 questions';$('continueBtn').textContent=final?'Restart quiz':'Start Question 6';$('leaderBody').innerHTML=Object.values(state.players||{}).sort((a,b)=>(b.score||0)-(a.score||0)).map((p,i)=>`<tr><td class="podium">${['🥇','🥈','🥉'][i]||i+1}</td><td>${escapeHtml(p.pseudo)}</td><td>${p.score||0}</td><td>${p.correct||0}</td></tr>`).join('')}
