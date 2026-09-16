@@ -57,12 +57,9 @@ if(p.get('room')){
 
     $('pseudo').focus();
 
-    // Hide host section
-    document
-        .querySelector('h3:last-of-type')
-        ?.closest('div')
-        ?.style.setProperty('display','none');
-
+    // Hide host area
+    document.querySelectorAll('.grid > div')[1]
+        .style.display = 'none';
 }}
 function cleanRoom(v){return v.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6)}
 async function hostGame(){room=cleanRoom($('hostRoom').value);if(!room)return msg('Enter a room code.');role='host';await db.ref('rooms/'+room+'/meta').update({status:'lobby',questionIndex:-1,revealed:false,updatedAt:firebase.database.ServerValue.TIMESTAMP});enterRoom()}
