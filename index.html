@@ -48,7 +48,22 @@ const questions=[
 let db,room='',role='',uid='',state={},timerInt=null,joinedAt=0;
 const $=id=>document.getElementById(id), show=id=>{['landing','lobby','quiz','leaderboard','config'].forEach(x=>$(x).classList.add('hidden'));$(id).classList.remove('hidden')};
 function configured(){return !FIREBASE_CONFIG.apiKey.startsWith('PASTE_')}
-async function init(){if(!configured()){show('config');return}firebase.initializeApp(FIREBASE_CONFIG);db=firebase.database();await firebase.auth().signInAnonymously();uid=firebase.auth().currentUser.uid;const p=new URLSearchParams(location.search);if(p.get('room')){$('joinRoom').value=p.get('room').toUpperCase();$('pseudo').focus()}}
+async function init(){if(!configured()){show('config');return}firebase.initializeApp(FIREBASE_CONFIG);db=firebase.database();await firebase.auth().signInAnonymously();uid=firebase.auth().currentUser.uid;const p = new URLSearchParams(location.search);
+
+if(p.get('room')){
+
+    $('joinRoom').value =
+        p.get('room').toUpperCase();
+
+    $('pseudo').focus();
+
+    // Hide host section
+    document
+        .querySelector('h3:last-of-type')
+        ?.closest('div')
+        ?.style.setProperty('display','none');
+
+}
 function cleanRoom(v){return v.toUpperCase().replace(/[^A-Z0-9]/g,'').slice(0,6)}
 async function hostGame(){room=cleanRoom($('hostRoom').value);if(!room)return msg('Enter a room code.');role='host';await db.ref('rooms/'+room+'/meta').update({status:'lobby',questionIndex:-1,revealed:false,updatedAt:firebase.database.ServerValue.TIMESTAMP});enterRoom()}
 async function joinGame(){room=cleanRoom($('joinRoom').value);const pseudo=$('pseudo').value.trim().slice(0,24);if(!room||!pseudo)return msg('Enter the room code and a nickname.');role='player';const snap=await db.ref(`rooms/${room}/players`).orderByChild('pseudoLower').equalTo(pseudo.toLowerCase()).once('value');if(snap.exists())return msg('This nickname is already in use. Please choose another.');await db.ref(`rooms/${room}/players/${uid}`).set({pseudo,pseudoLower:pseudo.toLowerCase(),score:0,correct:0,joinedAt:firebase.database.ServerValue.TIMESTAMP});enterRoom()}
